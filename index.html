@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>THE FREEDOM WEB</title>
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, push, onChildAdded, update, remove, get, set, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+        
+        const firebaseConfig = {
+            databaseURL: "https://the-freedom-web-8fbd6-default-rtdb.europe-west1.firebasedatabase.app/" 
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        window.dbRefs = {
+            posts: ref(db, 'posts'),
+            users: ref(db, 'users'),
+            visits: ref(db, 'visits'),
+            friends: ref(db, 'friends'),
+            chats: ref(db, 'chats'),
+            bans: ref(db, 'bans')
+        };
+        window.db = db;
+        window.fbPush = push;
+        window.fbRef = ref;
+        window.fbSet = set;
+        window.fbGet = get;
+        window.fbRemove = remove;
+        window.fbUpdate = update;
+        window.fbOnChild = onChildAdded;
+        window.fbOnValue = onValue;
+    </script>
+    <style>
+        body {
+            background-color: #e0e0e0;
+            font-family: "Comic Sans MS", "Arial", sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #222;
+            color: #fff;
+            padding: 10px 15px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .top-bar-left, .top-bar-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .visit-counter {
+            background: #ff00ff;
+            color: #fff;
+            padding: 4px 8px;
+            font-weight: bold;
+            border-radius: 3px;
+        }
+
+        .auth-box {
+            background: #fff;
+            color: #000;
+            padding: 15px;
+            border: 3px solid #000;
+            margin-bottom: 20px;
+            max-width: 450px;
+            margin-left: auto;
+            margin-right: auto;
+            box-shadow: 5px 5px 0px #888;
+        }
+
+        .rainbow-title {
+            font-size: 3.5rem;
+            text-align: center;
+            font-weight: bold;
+            background: linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet);
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            transform: rotate(-2deg);
+            margin-bottom: 15px;
+        }
+
+        .rules-box {
+            background: #fff3f3;
+            border: 2px dashed #ff4d4d;
+            padding: 10px;
+            max-width: 550px;
+            margin: 0 auto 20px auto;
+            font-size: 0.85rem;
+            color: #333;
+        }
+
+        .control-panel {
+            background: #ffffcc;
+            border: 3px solid #ff9900;
+            padding: 15px;
+            max-width: 500px;
+            margin: 0 auto;
+            box-shadow: 5px 5px 0px #999;
+        }
+
+        .admin-panel {
+            background: #ffdddd;
+            border: 3px solid #cc0000;
+            padding: 15px;
+            max-width: 500px;
+            margin: 20px auto;
+            display: none;
+        }
+
+        .control-panel input, .control-panel textarea, .auth-box input {
+            width: 95%;
+            margin-bottom: 10px;
+            padding: 8px;
+            border: 2px solid #333;
+        }
+
+        .btn-aggiungi {
+            background-color: #ff00ff;
+            color: white;
+            font-size: 1.2rem;
+            font-weight: bold;
+            padding: 10px 20px;
+            border: 3px outset #ff00ff;
+            cursor: pointer;
+            width: 100%;
+        }
+
+        #wall {
+            position: relative;
+            width: 100%;
+            height: 1500px;
+            background: #ffffff;
+            border: 4px solid #000;
+            margin-top: 30px;
+            overflow: auto;
+        }
+
+        .post-card {
+            position: absolute;
+            background: #fff;
+            border: 2px solid #000;
+            padding: 10px;
+            width: 270px;
+            box-shadow: 3px 3px 5px rgba(0,0,0,0.4);
+            transform: rotate(var(--rot));
+        }
+
+        .post-author {
+            font-weight: bold;
+            color: #0000cc;
+            margin-bottom: 5px;
+            font-size: 0.95rem;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 3px;
+            cursor: pointer;
+            text-decoration: underline;
+        }
+
+        .post-card img, .post-card video {
+            width: 100%;
+            height: 150px;
+            object-fit: cover;
+            border: 1px solid #ccc;
+        }
+
+        .post-card p {
+            margin: 5px 0;
+            font-size: 0.85rem;
+            word-break: break-all;
+        }
+
+        .btn-delete-admin {
+            background: #ff0000;
+            color: #fff;
+            border: none;
+            padding: 2px 6px;
+            font-weight: bold;
+            cursor: pointer;
+            float: right;
+            font-size: 0.7rem;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #fff;
+            border: 3px solid #000;
+            padding: 20px;
+            z-index: 2000;
+            box-shadow: 10px 10px 0px #333;
+            width: 320px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-help {
+            background: #e6f3ff;
+            border: 4px solid #0066cc;
+            width: 380px;
+        }
+
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6);
+            z-index: 1999;
+        }
+
+        .profile-img {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid #333;
+            margin-bottom: 10px;
+        }
+
+        .chat-box {
+            height: 200px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            padding: 5px;
+            margin-bottom: 10px;
+            background: #fafafa;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Bar Superiore -->
+    <div class="top-bar">
+        <div class="top-bar-left">
+            <span>👤 <b id="user-display">Non connesso</b></span>
+            <button id="btn-my-profile" style="display:none;" onclick="apriMioProfilo()">⚙️ Mio Profilo</button>
+            <button id="btn-notifications" style="display:none;" onclick="apriNotifiche()">🔔 Notifiche (<span id="notif-count">0</span>)</button>
+            <button id="btn-friends" style="display:none;" onclick="apriAmici()">💬 Chat Amici</button>
+            <button id="btn-logout" style="display:none; background:#ff4d4d; color:white;" onclick="logout()">🚪 Logout</button>
+        </div>
+        <div class="top-bar-right">
+            <span class="visit-counter">👀 Visite: <span id="visit-count">0</span></span>
+            🌐 
+            <select id="langSelect">
+                <option value="it">Italiano</option>
+                <option value="en">English</option>
+                <option value="fr">Français</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Login e Registrazione -->
+    <div class="auth-box" id="auth-container">
+        <h3>🔑 Accesso / Registrazione Utente</h3>
+        <input type="text" id="login-username" placeholder="Nome Utente"><br>
+        <input type="password" id="login-password" placeholder="Password"><br>
+        <button onclick="registraUtente()">Registrati</button>
+        <button onclick="accediUtente()">Accedi</button>
+    </div>
+
+    <div class="rainbow-title">THE FREEDOM WEB</div>
+
+    <div class="rules-box">
+        <h3 id="txt-rules-title">Regole della bacheca:</h3>
+        <ul>
+            <li id="txt-rule-1">✨ Le parolacce sono concesse.</li>
+            <li id="txt-rule-2">🚫 <b>Vietatissimi</b>: Fascismo, razzismo, nazismo, discriminazione e contenuti 18+.</li>
+            <li id="txt-rule-3">⏳ <b>Anti-spam</b>: Max 7 post/ora. Cambio nome bloccato per 1 settimana!</li>
+        </ul>
+    </div>
+
+    <!-- Pannello Admin (Visibile solo al creatore) -->
+    <div class="admin-panel" id="admin-panel">
+        <h3 style="color:#cc0000; margin-top:0;">👑 Pannello Creatore Ufficiale (Admin)</h3>
+        <p>Gestisci ban e moderazione dei contenuti:</p>
+        <input type="text" id="admin-target-user" placeholder="Nome Utente da bannare"><br><br>
+        <button onclick="bannaUtente('temp')" style="background:#ff9900; color:white; padding:5px;">Ban Temporaneo (24 Ore)</button>
+        <button onclick="bannaUtente('perma')" style="background:#cc0000; color:white; padding:5px;">Ban Permanente</button>
+        <button onclick="sbannaUtente()" style="background:#009900; color:white; padding:5px;">Sbanna Utente</button>
+    </div>
+
+    <!-- Pannello Pubblicazione -->
+    <div class="control-panel" id="post-panel" style="display:none;">
+        <label><b id="lbl-media">Link Media o Sito Web (URL):</b></label><br>
+        <input type="text" id="mediaUrl" placeholder="Es. link foto, video o sito web"><br>
+        
+        <label><b id="lbl-text">Il tuo testo:</b></label><br>
+        <textarea id="postText" placeholder="Scrivi qualcosa..."></textarea><br>
+        
+        <button class="btn-aggiungi" id="btn-add" onclick="pubblicaPost()">AGGIUNGI POST</button>
+    </div>
+
+    <div id="wall"></div>
+
+    <!-- Overlay & Modali -->
+    <div class="modal-overlay" id="overlay" onclick="chiudiModali()"></div>
+
+    <!-- Modale Supporto Anti-Suicidio -->
+    <div class="modal modal-help" id="modal-help">
+        <h2 style="color:#0066cc; margin-top:0;">🤝 Possiamo aiutarti?</h2>
+        <p>Non sei solo/a. Se stai attraversando un momento difficile o hai pensieri negativi, parla subito con qualcuno che può ascoltarti e aiutarti gratuitamente e in totale anonimato:</p>
+        <ul style="line-height: 1.6;">
+            <li>🇮🇹 <b>Italia - Telefono Amico:</b> <a href="tel:0223272327">02 2327 2327</a></li>
+            <li>🇮🇹 <b>Numero Unico di Emergenza:</b> <a href="tel:112">112</a></li>
+            <li>🌍 <b>Samaritans / Supporto Internazionale:</b> <a href="tel:116123">116 123</a></li>
+            <li>💬 <b>Chat WhatsApp Telefono Amico:</b> +39 324 011 7252</li>
+        </ul>
+        <button onclick="chiudiModali()" style="background:#0066cc; color:white; width:100%; padding:8px; border:none; cursor:pointer;">Ho capito / Chiudi</button>
+    </div>
+
+    <!-- Modale Modifica Mio Profilo -->
+    <div class="modal" id="modal-my-profile">
+        <h3>⚙️ Il tuo Profilo</h3>
+        <label>URL Immagine Profilo:</label><br>
+        <input type="text" id="edit-prof-img" placeholder="https://..."><br><br>
+        <label>La tua Bio / Descrizione:</label><br>
+        <textarea id="edit-prof-bio" placeholder="Racconta qualcosa di te..."></textarea><br><br>
+        <button onclick="salvaMioProfilo()">Salva Profilo</button>
+        <button onclick="chiudiModali()">Annulla</button>
+    </div>
+
+    <!-- Modale Profilo Altri Utenti -->
+    <div class="modal" id="modal-profile">
+        <h3 id="prof-title">Profilo Utente</h3>
+        <center>
+            <img id="view-prof-img" class="profile-img" src="https://via.placeholder.com/80?text=User" alt="Profilo">
+            <h4 id="prof-name" style="margin:5px 0;"></h4>
+            <p id="prof-bio" style="font-size:0.85rem; color:#555; font-style:italic;"></p>
+        </center>
+        <button onclick="inviaRichiestaAmicizia()">➕ Invia Richiesta di Amicizia</button>
+        <br><br>
+        <button onclick="chiudiModali()">Chiudi</button>
+    </div>
+
+    <!-- Modale Notifiche -->
+    <div class="modal" id="modal-notif">
+        <h3>🔔 Le tue Notifiche</h3>
+        <div id="notif-list">Nessuna nuova notifica.</div>
+        <br>
+        <button onclick="chiudiModali()">Chiudi</button>
+    </div>
+
+    <!-- Modale Amici / Chat -->
+    <div class="modal" id="modal-friends">
+        <h3>💬 I tuoi Amici</h3>
+        <div id="friends-list"></div>
+        <hr>
+        <div id="chat-section" style="display:none;">
+            <h4 id="chat-with-title">Chat</h4>
+            <div class="chat-box" id="chat-messages"></div>
+            <input type="text" id="chat-input" placeholder="Scrivi un messaggio...">
+            <button onclick="inviaMessaggioChat()">Invia</button>
+        </div>
+        <br>
+        <button onclick="chiudiModali()">Chiudi</button>
+    </div>
+
+    <script>
+        let currentUser = null;
+        let isAdmin = false;
+        let selectedProfileUser = null;
+        let activeChatFriend = null;
+
+        // Hash SHA-256 della password creatore (Nessuna password visibile in chiaro nel codice!)
+        const ADMIN_HASH = "b68f3a36dbdf1950d26859e971488c9a33ca8bf397bfd3eb63a9eb9c5e3153ec";
+
+        async function generaHash(stringa) {
+            const msgBuffer = new TextEncoder().encode(stringa);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        function convertiLink(testo) {
+            if (!testo) return '';
+            const urlRegex = /(https?:\/\/[^\s]+)/g;
+            return testo.replace(urlRegex, function(url) {
+                return `<a href="${url}" target="_blank" rel="noopener">${url}</a>`;
+            });
+        }
+
+        // Filtri Anti-Odio e Prevenzione Suicidio
+        function controllaFiltri(testo) {
+            if (!testo) return true;
+            const tLower = testo.toLowerCase();
+
+            const paroleSuicidio = ["suicidio", "suicidarmi", "suicidato", "ammazzarmi", "voglio morire", "tagliarmi", "autolesionismo", "kill myself", "suicide"];
+            for (let p of paroleSuicidio) {
+                if (tLower.includes(p)) {
+                    mostraSchermataAiuto();
+                    return false;
+                }
+            }
+
+            const vietateGrave = [
+                "fascista", "fascismo", "nazi", "nazista", "hitler", "ebreo", "negro", "zingaro", "terrone", "clandestino", "porno", "sex", "xxx", "18+", "stupro", "pedofilia",
+                "nigger", "nigga", "nigg", "racist", "racism", "porn", "porno", "rape", "pedophile"
+            ];
+            const tClean = tLower.replace(/[^a-z0-9]/g, '');
+            for (let parola of vietateGrave) {
+                if (tClean.includes(parola)) {
+                    alert("⚠️ Contenuto non consentito dalle regole della community.");
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        function mostraSchermataAiuto() {
+            document.getElementById('modal-help').style.display = 'block';
+            document.getElementById('overlay').style.display = 'block';
+        }
+
+        // Login & Registrazione & Logout
+        window.registraUtente = function() {
+            const u = document.getElementById('login-username').value.trim();
+            const p = document.getElementById('login-password').value.trim();
+            if (!u || !p) return alert("Inserisci nome utente e password!");
+
+            const uRef = window.fbRef(window.db, 'users/' + u);
+            window.fbGet(uRef).then((snap) => {
+                if (snap.exists()) {
+                    alert("Nome utente già esistente!");
+                } else {
+                    window.fbSet(uRef, { password: p, bio: "Nessuna bio inserita.", img: "" }).then(() => {
+                        impostaSessioneUtente(u);
+                        alert("Registrazione completata!");
+                    });
+                }
+            });
+        }
+
+        window.accediUtente = async function() {
+            const u = document.getElementById('login-username').value.trim();
+            const p = document.getElementById('login-password').value.trim();
+            if (!u || !p) return alert("Inserisci nome utente e password!");
+
+            // Verifica sicura tramite Cifratura Hash SHA-256
+            const passwordHashInput = await generaHash(p);
+            
+            if (u === "official creatore" && passwordHashInput === ADMIN_HASH) {
+                isAdmin = true;
+                document.getElementById('admin-panel').style.display = 'block';
+                impostaSessioneUtente(u);
+                alert("👑 Benvenuto Creatore Ufficiale! Modalità Amministratore attivata.");
+                return;
+            }
+
+            const uRef = window.fbRef(window.db, 'users/' + u);
+            window.fbGet(uRef).then((snap) => {
+                if (snap.exists() && snap.val().password === p) {
+                    impostaSessioneUtente(u);
+                } else {
+                    alert("Credenziali errate!");
+                }
+            });
+        }
+
+        window.logout = function() {
+            localStorage.removeItem('freedom_user');
+            location.reload();
+        }
+
+        function impostaSessioneUtente(username) {
+            const banRef = window.fbRef(window.db, 'bans/' + username);
+            window.fbGet(banRef).then((snap) => {
+                if (snap.exists()) {
+                    const banData = snap.val();
+                    const ora = new Date().getTime();
+                    if (banData.type === 'perma' || (banData.type === 'temp' && ora < banData.until)) {
+                        alert("🚫 Il tuo account è bannato! Non puoi accedere.");
+                        window.logout();
+                        return;
+                    }
+                }
+
+                currentUser = username;
+                localStorage.setItem('freedom_user', username);
+
+                document.getElementById('auth-container').style.display = 'none';
+                document.getElementById('post-panel').style.display = 'block';
+                document.getElementById('btn-my-profile').style.display = 'inline-block';
+                document.getElementById('btn-notifications').style.display = 'inline-block';
+                document.getElementById('btn-friends').style.display = 'inline-block';
+                document.getElementById('btn-logout').style.display = 'inline-block';
+                document.getElementById('user-display').innerText = username + (isAdmin ? " 👑 (Creatore)" : "");
+                
+                ascoltaNotifiche();
+            });
+        }
+
+        // Modifica Profilo
+        window.apriMioProfilo = function() {
+            const uRef = window.fbRef(window.db, 'users/' + currentUser);
+            window.fbGet(uRef).then((snap) => {
+                if (snap.exists()) {
+                    const data = snap.val();
+                    document.getElementById('edit-prof-img').value = data.img || '';
+                    document.getElementById('edit-prof-bio').value = data.bio || '';
+                }
+                document.getElementById('modal-my-profile').style.display = 'block';
+                document.getElementById('overlay').style.display = 'block';
+            });
+        }
+
+        window.salvaMioProfilo = function() {
+            const img = document.getElementById('edit-prof-img').value.trim();
+            const bio = document.getElementById('edit-prof-bio').value.trim();
+
+            if (!controllaFiltri(bio)) return;
+
+            const uRef = window.fbRef(window.db, 'users/' + currentUser);
+            window.fbUpdate(uRef, { img: img, bio: bio }).then(() => {
+                alert("Profilo aggiornato!");
+                chiudiModali();
+            });
+        }
+
+        // Pubblicazione Post
+        window.pubblicaPost = function() {
+            if (!currentUser) return alert("Devi accedere per pubblicare!");
+
+            const mediaUrl = document.getElementById('mediaUrl').value.trim();
+            const text = document.getElementById('postText').value.trim();
+
+            if (!mediaUrl && !text) return alert("Inserisci un testo o un media!");
+            if (!controllaFiltri(text) || !controllaFiltri(mediaUrl)) return;
+
+            const maxX = document.getElementById('wall').clientWidth - 290;
+            const maxY = document.getElementById('wall').clientHeight - 350;
+            const randomX = Math.floor(Math.random() * Math.max(10, maxX));
+            const randomY = Math.floor(Math.random() * Math.max(10, maxY));
+            const randomRot = (Math.random() * 16 - 8).toFixed(1);
+
+            const postData = {
+                author: currentUser,
+                media: mediaUrl,
+                text: text,
+                x: randomX,
+                y: randomY,
+                rot: randomRot
+            };
+
+            window.fbPush(window.dbRefs.posts, postData);
+            document.getElementById('mediaUrl').value = '';
+            document.getElementById('postText').value = '';
+        }
+
+        // Renderizza Post
+        function renderizzaPost(postId, post) {
+            const wall = document.getElementById('wall');
+            if (document.getElementById('post-' + postId)) return;
+
+            const card = document.createElement('div');
+            card.className = 'post-card';
+            card.id = 'post-' + postId;
+            card.style.left = (post.x || 20) + 'px';
+            card.style.top = (post.y || 20) + 'px';
+            card.style.setProperty('--rot', (post.rot || 0) + 'deg');
+
+            let deleteBtn = isAdmin ? `<button class="btn-delete-admin" onclick="cancellaPostAdmin('${postId}')">🗑️ Elimina</button>` : '';
+
+            let contenutoHTML = `
+                ${deleteBtn}
+                <div class="post-author" onclick="apriProfiloUtente('${post.author}')">👤 ${post.author || 'Anonimo'}</div>
+            `;
+
+            if (post.media) {
+                if (post.media.includes('.mp4') || post.media.includes('video')) {
+                    contenutoHTML += `<video src="${post.media}" controls></video>`;
+                } else if (post.media.startsWith('http')) {
+                    contenutoHTML += `<img src="${post.media}" onerror="this.onerror=null; this.parentElement.innerHTML+='<p>${convertiLink(post.media)}</p>'">`;
+                }
+            }
+            if (post.text) {
+                contenutoHTML += `<p>${convertiLink(post.text)}</p>`;
+            }
+
+            card.innerHTML = contenutoHTML;
+            wall.appendChild(card);
+        }
+
+        // Funzioni Admin (Creatore)
+        window.cancellaPostAdmin = function(postId) {
+            if (!isAdmin) return;
+            if (confirm("Sei sicuro di voler cancellare questo post?")) {
+                const postRef = window.fbRef(window.db, 'posts/' + postId);
+                window.fbRemove(postRef).then(() => {
+                    const el = document.getElementById('post-' + postId);
+                    if (el) el.remove();
+                });
+            }
+        }
+
+        window.bannaUtente = function(tipo) {
+            if (!isAdmin) return;
+            const target = document.getElementById('admin-target-user').value.trim();
+            if (!target) return alert("Inserisci il nome dell'utente da bannare!");
+
+            const ora = new Date().getTime();
+            const banData = {
+                type: tipo,
+                until: tipo === 'temp' ? (ora + (24 * 60 * 60 * 1000)) : 0
+            };
+
+            window.fbSet(window.fbRef(window.db, 'bans/' + target), banData).then(() => {
+                alert(`Utente ${target} bannato (${tipo === 'temp' ? '24 Ore' : 'Permanente'})!`);
+            });
+        }
+
+        window.sbannaUtente = function() {
+            if (!isAdmin) return;
+            const target = document.getElementById('admin-target-user').value.trim();
+            if (!target) return;
+
+            window.fbRemove(window.fbRef(window.db, 'bans/' + target)).then(() => {
+                alert(`Utente ${target} sbannato!`);
+            });
+        }
+
+        // Profilo Altri Utenti
+        window.apriProfiloUtente = function(username) {
+            selectedProfileUser = username;
+            document.getElementById('prof-name').innerText = username;
+            
+            const uRef = window.fbRef(window.db, 'users/' + username);
+            window.fbGet(uRef).then((snap) => {
+                if (snap.exists()) {
+                    const d = snap.val();
+                    document.getElementById('view-prof-img').src = d.img || 'https://via.placeholder.com/80?text=User';
+                    document.getElementById('prof-bio').innerText = d.bio || 'Nessuna bio inserita.';
+                }
+                document.getElementById('modal-profile').style.display = 'block';
+                document.getElementById('overlay').style.display = 'block';
+            });
+        }
+
+        window.inviaRichiestaAmicizia = function() {
+            if (!currentUser) return alert("Devi fare il login!");
+            if (currentUser === selectedProfileUser) return alert("Non puoi inviare l'amicizia a te stesso!");
+
+            const notifRef = window.fbRef(window.db, 'notifications/' + selectedProfileUser);
+            window.fbPush(notifRef, { from: currentUser, type: 'friend_request' }).then(() => {
+                alert("Richiesta di amicizia inviata!");
+                chiudiModali();
+            });
+        }
+
+        function ascoltaNotifiche() {
+            if (!currentUser) return;
+            const notifRef = window.fbRef(window.db, 'notifications/' + currentUser);
+            window.fbOnValue(notifRef, (snap) => {
+                const data = snap.val();
+                let count = 0;
+                let listHTML = '';
+                if (data) {
+                    for (let key in data) {
+                        count++;
+                        listHTML += `<div>Richiesta da <b>${data[key].from}</b> 
+                        <button onclick="accettaAmico('${data[key].from}', '${key}')">Accetta</button></div><hr>`;
+                    }
+                }
+                document.getElementById('notif-count').innerText = count;
+                document.getElementById('notif-list').innerHTML = listHTML || "Nessuna notifica.";
+            });
+        }
+
+        window.accettaAmico = function(friendName, notifKey) {
+            window.fbSet(window.fbRef(window.db, `friends/${currentUser}/${friendName}`), true);
+            window.fbSet(window.fbRef(window.db, `friends/${friendName}/${currentUser}`), true);
+            window.fbRemove(window.fbRef(window.db, `notifications/${currentUser}/${notifKey}`));
+            alert("Amicizia accettata!");
+            chiudiModali();
+        }
+
+        window.apriNotifiche = function() {
+            document.getElementById('modal-notif').style.display = 'block';
+            document.getElementById('overlay').style.display = 'block';
+        }
+
+        window.apriAmici = function() {
+            if (!currentUser) return alert("Effettua il login!");
+            const friendsRef = window.fbRef(window.db, 'friends/' + currentUser);
+            window.fbGet(friendsRef).then((snap) => {
+                let html = '';
+                if (snap.exists()) {
+                    const friends = snap.val();
+                    for (let f in friends) {
+                        html += `<button onclick="avviaChat('${f}')">💬 Chat con ${f}</button><br><br>`;
+                    }
+                } else {
+                    html = "Non hai ancora nessun amico.";
+                }
+                document.getElementById('friends-list').innerHTML = html;
+                document.getElementById('modal-friends').style.display = 'block';
+                document.getElementById('overlay').style.display = 'block';
+            });
+        }
+
+        window.avviaChat = function(friendName) {
+            activeChatFriend = friendName;
+            document.getElementById('chat-with-title').innerText = "Chat con " + friendName;
+            document.getElementById('chat-section').style.display = 'block';
+            
+            const chatId = currentUser < friendName ? `${currentUser}_${friendName}` : `${friendName}_${currentUser}`;
+            const chatRef = window.fbRef(window.db, 'chats/' + chatId);
+            
+            window.fbOnValue(chatRef, (snap) => {
+                let msgsHTML = '';
+                if (snap.exists()) {
+                    const msgs = snap.val();
+                    for (let k in msgs) {
+                        msgsHTML += `<div><b>${msgs[k].sender}:</b> ${msgs[k].text}</div>`;
+                    }
+                }
+                document.getElementById('chat-messages').innerHTML = msgsHTML;
+            });
+        }
+
+        window.inviaMessaggioChat = function() {
+            const input = document.getElementById('chat-input');
+            const txt = input.value.trim();
+            if (!txt || !activeChatFriend) return;
+            if (!controllaFiltri(txt)) return;
+
+            const chatId = currentUser < activeChatFriend ? `${currentUser}_${activeChatFriend}` : `${activeChatFriend}_${currentUser}`;
+            const chatRef = window.fbRef(window.db, 'chats/' + chatId);
+            window.fbPush(chatRef, { sender: currentUser, text: txt });
+            input.value = '';
+        }
+
+        window.chiudiModali = function() {
+            document.querySelectorAll('.modal').forEach(m => m.style.display = 'none');
+            document.getElementById('overlay').style.display = 'none';
+        }
+
+        function incrementaVisite() {
+            const visitRef = window.fbRef(window.db, 'visits');
+            window.fbGet(visitRef).then((snap) => {
+                let count = (snap.val() || 0) + 1;
+                window.fbSet(visitRef, count);
+                document.getElementById('visit-count').innerText = count;
+            });
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const savedUser = localStorage.getItem('freedom_user');
+            if (savedUser) {
+                if (savedUser === "official creatore") {
+                    isAdmin = true;
+                    document.getElementById('admin-panel').style.display = 'block';
+                }
+                impostaSessioneUtente(savedUser);
+            }
+
+            const checkInterval = setInterval(() => {
+                if (window.dbRefs) {
+                    incrementaVisite();
+                    window.fbOnChild(window.dbRefs.posts, (snap) => {
+                        renderizzaPost(snap.key, snap.val());
+                    });
+                    clearInterval(checkInterval);
+                }
+            }, 100);
+        });
+    </script>
+</body>
+</html>
